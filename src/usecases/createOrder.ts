@@ -2,6 +2,10 @@ import { z } from 'zod'
 import { Order } from '../domain/order'
 import { OrderRepository } from '../infra/repositories/orderRepo'
 import crypto from 'crypto'
+import { PgOutboxRepository } from '../infra/repositories/outboxRepo'
+import { pool } from '../infra/db/postgres'
+
+const outboxRepo = new PgOutboxRepository(pool)
 
 const createOrderSchema = z.object({
   userId: z.string().min(1),
@@ -23,6 +27,14 @@ export class CreateOrderUseCase {
       createdAt: new Date().toISOString()
     }
     await this.repo.save(order)
+
+    await outboxRepo.addEvent('order.created', {
+      id: order.id,
+      userId: order.userId,
+      total: order.total,
+      createdAt: order.createdAt,
+    })
+    
     return order
   }
 }
